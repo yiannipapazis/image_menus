@@ -36,12 +36,16 @@ class reload_images_menu(bpy.types.Menu):
         layout.label(text="Images")
 
         image_list = ['image1', 'image_200.jpg', 'image_300.jpg']
+        get_images_from_objects()
 
         for image in image_list:
             layout.label(text=image, icon='IMAGE_DATA')
 
 def get_images_from_objects():
-    return
+    active_object = bpy.context.active_object
+    materials = active_object.material_slots
+    for slot in materials:
+        print(slot.material)
 """
 classes = (
     reload_images_menu
@@ -57,7 +61,7 @@ def register():
     # register keymaps
     wm = bpy.context.window_manager
     kc = wm.keyconfigs.addon
-    km = kc.keymaps.new(name="Object Mode", space_type="VIEW_3D")
+    km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
     kmi = km.keymap_items.new(
         "wm.call_menu",
         type="R",
