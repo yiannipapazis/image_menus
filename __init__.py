@@ -14,10 +14,10 @@
 import bpy
 
 bl_info = {
-    "name" : "Image Operators",
+    "name" : "Image Menus",
     "author" : "Yianni Papazis",
-    "description" : "",
-    "blender" : (2, 80, 0),
+    "description" : "Some menus for making working with images easier.",
+    "blender" : (2, 90, 0),
     "version" : (0, 0, 1),
     "location" : "",
     "warning" : "",
@@ -33,24 +33,45 @@ class reload_images_menu(bpy.types.Menu):
 
     def draw(self, context):
         layout = self.layout
-        layout.label(text="Recent")
-        layout.label(text="Images")
-        layout.label(text="Reload All", icon="FILE_REFRESH")
+        # TODO make recent images reload
+        # layout.label(text="Recent")
+        # layout.label(text="Images")
         image_list = get_images_from_objects()
-        for image_node in image_list:
-            image = image_node.image
-            o = layout.operator(reload_image_by_name.bl_idname, text=image.name, icon='IMAGE_DATA')
-            o.image_name = image.name
+        
+        if image_list:
+            image_data = [img.image.name for img in image_list]
+            o = layout.operator(reload_image_by_name.bl_idname, text="Reload All", icon="FILE_REFRESH")
+            o.reload_list = True
+            o.image_name = str(image_data)
+
+            layout.separator()
+
+            for image_node in image_list:
+                image = image_node.image
+                o = layout.operator(reload_image_by_name.bl_idname, text=image.name, icon='IMAGE_DATA')
+                o.reload_list = False
+                o.image_name = image.name
+        else:
+            layout.label("No images")
 
 class reload_image_by_name(bpy.types.Operator):
     bl_idname = "object.reload_image_by_name"
     bl_label = "Reload Image by Name"
     image_name = bpy.props.StringProperty()
+    reload_list = bpy.props.BoolProperty(default=False)
 
     def execute(self, context):
         if self.image_name:
-            
-            bpy.data.images[self.image_name].reload()
+            if not self.reload_list:
+                bpy.data.images[self.image_name].reload()
+            else:
+                # converting string list to list
+                # probably doing this in a stupid
+                image_list = self.image_name[1:-1].split(',')
+                image_list = [img.strip(' ')[1:-1] for img in image_list]
+
+                for image in image_list:
+                    bpy.data.images[image].reload()
         return {'FINISHED'}
 
 class load_from_selected_menu(bpy.types.Menu):
@@ -58,37 +79,50 @@ class load_from_selected_menu(bpy.types.Menu):
     bl_label = "Load from Selected"
     bl_space_type = "IMAGE_EDITOR"
 
+    class operator(bpy.types.Operator):
+        bl_idname = "load_from_selected.my_class_name"
+        bl_label = "Load From Selected"
+        image_name = bpy.props.StringProperty()
+    
+        @classmethod
+        def poll(cls, context):
+            return True
+    
+        def execute(self, context):
+            image = bpy.data.images[self.image_name]
+            bpy.context.area.spaces.active.image = image
+            return {"FINISHED"}
+    
+
     def draw(self, context):
         layout = self.layout
 
-        image_list = get_images_from_objects()
+        material_list = get_materials_from_selected()
+        if material_list:
+            for mat in material_list:
+                layout.label(text=mat, icon='MATERIAL')
+                layout.separator()
+                mat_image_nodes = look_for_images_from_mat(
+                    bpy.data.materials[mat])
 
-        for image in image_list:
-            layout.label(text=image, icon='IMAGE_DATA')
+                # build menu for each material
+                if mat_image_nodes:
+                    for image_node in mat_image_nodes:
+                        o = layout.operator(
+                            self.operator.bl_idname, text=image_node.image.name, icon='IMAGE_DATA')
+                        o.image_name = image_node.image.name
+                    layout.separator()
+                else:
+                    layout.label(text="No images")
+        else:
+            layout.label(text='No materials')
 
 class make_active_from_selected_menu(bpy.types.Menu):
     bl_idname = "object.make_active_from_selected_menu"
     bl_label = "Make Image Active"
     image_name = ""
 
-    class menu(bpy.types.Menu):
-        bl_idname = "object.make_active_from_image_menu"
-        bl_label = "Material"
-        mat_name = bpy.props.StringProperty()
-
-        def draw(self, context):
-            layout = self.layout
-            mat_image_nodes = look_for_images_from_mat(bpy.data.materials[self.mat_name])
-            operators = []
-            if mat_image_nodes:
-                for image_node in mat_image_nodes:
-                    o = layout.operator(self.operator.bl_idname, text=image_node.image.name, icon='IMAGE_DATA')
-                    o.mat_name = self.mat_name
-                    o.node_name = str(image_node)
-            else:
-                layout.label(text="No images")
-
-        class operator(bpy.types.Operator):
+    class operator(bpy.types.Operator):
             bl_idname = "object.make_active_from_selected"
             bl_label = "Make Image Active"
             mat_name = bpy.props.StringProperty()
@@ -110,9 +144,21 @@ class make_active_from_selected_menu(bpy.types.Menu):
         material_list = get_materials_from_selected()
         if material_list:
             for mat in material_list:
-                m = self.menu
-                m.mat_name = mat
-                layout.menu(m.bl_idname, text=mat, icon="MATERIAL")
+                layout.label(text=mat, icon='MATERIAL')
+                layout.separator()
+                mat_image_nodes = look_for_images_from_mat(
+                    bpy.data.materials[mat])
+
+                # build menu for each material
+                if mat_image_nodes:
+                    for image_node in mat_image_nodes:
+                        o = layout.operator(
+                            self.operator.bl_idname, text=image_node.image.name, icon='IMAGE_DATA')
+                        o.mat_name = mat
+                        o.node_name = str(image_node)
+                    layout.separator()
+                else:
+                    layout.label(text="No images")
         else:
             layout.label(text='No materials')
 
@@ -154,10 +200,10 @@ def get_materials_from_selected():
 classes = (
     reload_images_menu,
     load_from_selected_menu,
+    load_from_selected_menu.operator,
     reload_image_by_name,
-    make_active_from_selected_menu.menu.operator,
-    make_active_from_selected_menu,
-    make_active_from_selected_menu.menu
+    make_active_from_selected_menu.operator,
+    make_active_from_selected_menu
 )
 
 def register():
