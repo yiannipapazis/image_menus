@@ -143,6 +143,7 @@ class make_active_from_selected_menu(bpy.types.Menu):
         layout = self.layout
         material_list = get_materials_from_selected()
         if material_list:
+            layout.menu(reload_images_menu.bl_idname)
             for mat in material_list:
                 layout.label(text=mat, icon='MATERIAL')
                 layout.separator()
@@ -214,16 +215,6 @@ def register():
     # register keymaps
     wm = bpy.context.window_manager
     kc = wm.keyconfigs.addon
-
-    km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
-    kmi = km.keymap_items.new(
-        "wm.call_menu",
-        type="R",
-        value="PRESS",
-        shift=True
-        )
-    kmi.properties.name = reload_images_menu.bl_idname
-    addon_keymaps.append((km,kmi))
 
     km = kc.keymaps.new(name="Image", space_type="IMAGE_EDITOR")
     kmi = km.keymap_items.new(
