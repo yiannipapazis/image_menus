@@ -13,14 +13,20 @@
 
 import bpy
 
+from bpy.props import IntProperty, FloatProperty, BoolProperty, EnumProperty, StringProperty
+import rna_keymap_ui
+from bpy.types import AddonPreferences
+
 bl_info = {
     "name" : "Image Menus",
-    "author" : "Yianni Papazis",
+    "author" : "Yianni Papazis, Zuorion",
     "description" : "Some menus for making working with images easier.",
-    "blender" : (2, 90, 0),
-    "version" : (0, 0, 1),
-    "location" : "",
+    "blender" : (2, 93, 0),
+    "version" : (0, 0, 3),
+    "location" : "Shift+I in 3d view and image editor",
     "warning" : "",
+    "wiki_url": "https://github.com/yiannipapazis/image_menus",
+    "tracker_url": "https://github.com/yiannipapazis/image_menus/issues",
     "category" : "Generic"
 }
 
@@ -40,7 +46,7 @@ class reload_images_menu(bpy.types.Menu):
         
         if image_list:
             image_data = [img.image.name for img in image_list]
-            o = layout.operator(reload_image_by_name.bl_idname, text="Reload All", icon="FILE_REFRESH")
+            o = layout.operator("object.reload_image_by_name", text="Reload All", icon="FILE_REFRESH")
             o.reload_list = True
             o.image_name = str(image_data)
 
@@ -48,7 +54,7 @@ class reload_images_menu(bpy.types.Menu):
 
             for image_node in image_list:
                 image = image_node.image
-                o = layout.operator(reload_image_by_name.bl_idname, text=image.name, icon='IMAGE_DATA')
+                o = layout.operator("object.reload_image_by_name", text=image.name, icon='IMAGE_DATA')
                 o.reload_list = False
                 o.image_name = image.name
         else:
@@ -57,8 +63,13 @@ class reload_images_menu(bpy.types.Menu):
 class reload_image_by_name(bpy.types.Operator):
     bl_idname = "object.reload_image_by_name"
     bl_label = "Reload Image by Name"
-    image_name = bpy.props.StringProperty()
-    reload_list = bpy.props.BoolProperty(default=False)
+    image_name: StringProperty(
+            name = 'Image Name',
+            default = ''
+        )
+    reload_list: BoolProperty(
+        default=False
+        )
 
     def execute(self, context):
         if self.image_name:
@@ -82,7 +93,10 @@ class load_from_selected_menu(bpy.types.Menu):
     class operator(bpy.types.Operator):
         bl_idname = "load_from_selected.my_class_name"
         bl_label = "Load From Selected"
-        image_name = bpy.props.StringProperty()
+        image_name: bpy.props.StringProperty(
+            name = 'Image Name',
+            default = ''
+            )
     
         @classmethod
         def poll(cls, context):
@@ -125,8 +139,14 @@ class make_active_from_selected_menu(bpy.types.Menu):
     class operator(bpy.types.Operator):
             bl_idname = "object.make_active_from_selected"
             bl_label = "Make Image Active"
-            mat_name = bpy.props.StringProperty()
-            node_name = bpy.props.StringProperty()
+            mat_name: bpy.props.StringProperty(
+                name = 'Material Name',
+                default = ''
+                )
+            node_name: bpy.props.StringProperty(
+                name = 'Node Name',
+                default = ''
+                )
 
             def execute(self, context):
 
@@ -137,6 +157,7 @@ class make_active_from_selected_menu(bpy.types.Menu):
                         node = each
                 node.select = True
                 node_tree.nodes.active = node
+                bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
                 return {'FINISHED'}
     
     def draw(self, context):
@@ -198,13 +219,65 @@ def get_materials_from_selected():
                 object_materials.append(mat)
     return object_materials
 
+class Prefs(AddonPreferences):
+    bl_idname = __name__
+    
+    
+    def draw(self, context):
+        def get_menu_hotkey(km, kmi_name, kmi_value):
+            for i, km_item in enumerate(km.keymap_items):
+                if km.keymap_items.keys()[i] == kmi_name:
+                    if km.keymap_items[i].properties.name == kmi_value:
+                        return km_item
+        
+        layout = self.layout
+        wm = bpy.context.window_manager
+        
+ 
+        box = layout.box()
+        split = box.split()
+        col = split.column()
+        col.label(text='Hotkey')
+        col.separator()
+        kc = wm.keyconfigs.addon
+        
+        km = kc.keymaps['Image']
+        kmi = get_menu_hotkey(km, 'wm.call_menu', "load_from_selected_menu")
+        if kmi:
+            col.context_pointer_set("keymap", km)
+            rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
+        else:
+            col.label(text="No keymap entry found")
+        
+        
+        km = kc.keymaps['3D View']
+        kmi = get_menu_hotkey(km, 'wm.call_menu', "object.make_active_from_selected_menu")
+        if kmi:
+            col.context_pointer_set("keymap", km)
+            rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
+        else:
+            col.label(text="No keymap entry found")
+            
+        km = kc.keymaps['3D View']
+        kmi = get_menu_hotkey(km, 'wm.call_menu', "reload_images_menu")
+        if kmi:
+            col.context_pointer_set("keymap", km)
+            rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
+        else:
+            col.label(text="No keymap entry found")
+        #object.make_active_from_selected_menu
+
+
+
+
 classes = (
     reload_images_menu,
     load_from_selected_menu,
     load_from_selected_menu.operator,
     reload_image_by_name,
     make_active_from_selected_menu.operator,
-    make_active_from_selected_menu
+    make_active_from_selected_menu,
+    Prefs
 )
 
 def register():
@@ -234,6 +307,17 @@ def register():
         shift=True
     )
     kmi.properties.name = make_active_from_selected_menu.bl_idname
+    addon_keymaps.append((km,kmi))
+    
+    kmi = km.keymap_items.new(
+        "wm.call_menu",
+        type="R",
+        value="PRESS",
+        shift=True,
+        alt=True
+    )
+    kmi.properties.name = reload_images_menu.bl_idname
+    kmi.active = False 
     addon_keymaps.append((km,kmi))
 
 def unregister():
