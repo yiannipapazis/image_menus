@@ -58,7 +58,7 @@ class reload_images_menu(bpy.types.Menu):
                 o.reload_list = False
                 o.image_name = image.name
         else:
-            layout.label("No images")
+            layout.label(text="No images")
 
 class reload_image_by_name(bpy.types.Operator):
     bl_idname = "object.reload_image_by_name"
@@ -201,9 +201,20 @@ def get_images_from_objects():
 
 def look_for_images_from_mat(mat = bpy.types.Material):
     image_list = []
-    for node in mat.node_tree.nodes:
+    nodes = list(mat.node_tree.nodes)
+    for node in nodes:
         if node.type == 'TEX_IMAGE' and node.image not in image_list:
-            image_list.append(node)
+            # check if image actually exists 
+            try:
+                if node.image.name:
+                    image_list.append(node)
+            except AttributeError:
+                pass
+
+        # if group append node tree inside to loop nodes
+        elif node.type == 'GROUP':
+            nodes += list(node.node_tree.nodes)
+
     return image_list
 
 def get_materials_from_selected():
@@ -265,8 +276,6 @@ class Prefs(AddonPreferences):
             rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
         else:
             col.label(text="No keymap entry found")
-        #object.make_active_from_selected_menu
-
 
 
 
@@ -288,37 +297,37 @@ def register():
     # register keymaps
     wm = bpy.context.window_manager
     kc = wm.keyconfigs.addon
+    if kc:
+        km = kc.keymaps.new(name="Image", space_type="IMAGE_EDITOR")
+        kmi = km.keymap_items.new(
+            "wm.call_menu",
+            type="I",
+            value="PRESS",
+            shift=True
+            )
+        kmi.properties.name = load_from_selected_menu.bl_idname
+        addon_keymaps.append((km,kmi))
 
-    km = kc.keymaps.new(name="Image", space_type="IMAGE_EDITOR")
-    kmi = km.keymap_items.new(
-        "wm.call_menu",
-        type="I",
-        value="PRESS",
-        shift=True
+        km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
+        kmi = km.keymap_items.new(
+            "wm.call_menu",
+            type="I",
+            value="PRESS",
+            shift=True
         )
-    kmi.properties.name = load_from_selected_menu.bl_idname
-    addon_keymaps.append((km,kmi))
+        kmi.properties.name = make_active_from_selected_menu.bl_idname
+        addon_keymaps.append((km,kmi))
+        
+        kmi = km.keymap_items.new(
+            "wm.call_menu",
+            type="R",
+            value="PRESS",
+            shift=True,
+            alt=True
+        )
+        kmi.properties.name = reload_images_menu.bl_idname
 
-    km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
-    kmi = km.keymap_items.new(
-        "wm.call_menu",
-        type="I",
-        value="PRESS",
-        shift=True
-    )
-    kmi.properties.name = make_active_from_selected_menu.bl_idname
-    addon_keymaps.append((km,kmi))
-    
-    kmi = km.keymap_items.new(
-        "wm.call_menu",
-        type="R",
-        value="PRESS",
-        shift=True,
-        alt=True
-    )
-    kmi.properties.name = reload_images_menu.bl_idname
-    kmi.active = False 
-    addon_keymaps.append((km,kmi))
+        addon_keymaps.append((km,kmi))
 
 def unregister():
 
