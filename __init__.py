@@ -250,27 +250,43 @@ class Prefs(AddonPreferences):
         col = split.column()
         col.label(text='Hotkey')
         col.separator()
-        kc = wm.keyconfigs.addon
-        
+
+        kc = wm.keyconfigs.user
         km = kc.keymaps['Image']
         kmi = get_menu_hotkey(km, 'wm.call_menu', "load_from_selected_menu")
+        if not kmi:
+            kc = wm.keyconfigs.addon
+            km = kc.keymaps['Image']
+            kmi = get_menu_hotkey(km, 'wm.call_menu',
+                                  "load_from_selected_menu")
         if kmi:
             col.context_pointer_set("keymap", km)
             rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
         else:
             col.label(text="No keymap entry found")
-        
-        
+
+        kc = wm.keyconfigs.user
         km = kc.keymaps['3D View']
-        kmi = get_menu_hotkey(km, 'wm.call_menu', "object.make_active_from_selected_menu")
+        kmi = get_menu_hotkey(km, 'wm.call_menu',
+                              "object.make_active_from_selected_menu")
+        if not kmi:
+            kc = wm.keyconfigs.addon
+            km = kc.keymaps['3D View']
+            kmi = get_menu_hotkey(km, 'wm.call_menu',
+                                  "object.make_active_from_selected_menu")
         if kmi:
             col.context_pointer_set("keymap", km)
             rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
         else:
             col.label(text="No keymap entry found")
-            
+
+        kc = wm.keyconfigs.user
         km = kc.keymaps['3D View']
         kmi = get_menu_hotkey(km, 'wm.call_menu', "reload_images_menu")
+        if not kmi:
+            kc = wm.keyconfigs.addon
+            km = kc.keymaps['3D View']
+            kmi = get_menu_hotkey(km, 'wm.call_menu', "reload_images_menu")
         if kmi:
             col.context_pointer_set("keymap", km)
             rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
