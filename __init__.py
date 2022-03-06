@@ -114,20 +114,24 @@ class load_from_selected_menu(bpy.types.Menu):
         material_list = get_materials_from_selected()
         if material_list:
             for mat in material_list:
-                layout.label(text=mat, icon='MATERIAL')
-                layout.separator()
-                mat_image_nodes = look_for_images_from_mat(
-                    bpy.data.materials[mat])
-
-                # build menu for each material
-                if mat_image_nodes:
-                    for image_node in mat_image_nodes:
-                        o = layout.operator(
-                            self.operator.bl_idname, text=image_node.image.name, icon='IMAGE_DATA')
-                        o.image_name = image_node.image.name
+                try:
+                    mat_obj = bpy.data.materials[mat]
+                except KeyError:
+                    mat_obj = False
+                if mat_obj:
+                    mat_image_nodes = look_for_images_from_mat(
+                        mat_obj)
+                    layout.label(text=mat, icon='MATERIAL')
                     layout.separator()
-                else:
-                    layout.label(text="No images")
+                    # build menu for each material
+                    if mat_image_nodes:
+                        for image_node in mat_image_nodes:
+                            o = layout.operator(
+                                self.operator.bl_idname, text=image_node.image.name, icon='IMAGE_DATA')
+                            o.image_name = image_node.image.name
+                        layout.separator()
+                    else:
+                        layout.label(text="No images")
         else:
             layout.label(text='No materials')
 
@@ -166,21 +170,27 @@ class make_active_from_selected_menu(bpy.types.Menu):
         if material_list:
             layout.menu(reload_images_menu.bl_idname)
             for mat in material_list:
-                layout.label(text=mat, icon='MATERIAL')
-                layout.separator()
-                mat_image_nodes = look_for_images_from_mat(
-                    bpy.data.materials[mat])
-
-                # build menu for each material
-                if mat_image_nodes:
-                    for image_node in mat_image_nodes:
-                        o = layout.operator(
-                            self.operator.bl_idname, text=image_node.image.name, icon='IMAGE_DATA')
-                        o.mat_name = mat
-                        o.node_name = str(image_node)
+                try:
+                    mat_obj = bpy.data.materials[mat]
+                except KeyError:
+                    mat_obj = False
+                
+                if mat_obj:
+                    layout.label(text=mat, icon='MATERIAL')
                     layout.separator()
-                else:
-                    layout.label(text="No images")
+                    mat_image_nodes = look_for_images_from_mat(
+                        mat_obj)
+
+                    # build menu for each material
+                    if mat_image_nodes:
+                        for image_node in mat_image_nodes:
+                            o = layout.operator(
+                                self.operator.bl_idname, text=image_node.image.name, icon='IMAGE_DATA')
+                            o.mat_name = mat
+                            o.node_name = str(image_node)
+                        layout.separator()
+                    else:
+                        layout.label(text="No images")
         else:
             layout.label(text='No materials')
 
@@ -191,12 +201,13 @@ def get_images_from_objects():
     materials = active_object.material_slots
     for mat in materials:
         mat = mat.material
-        if mat not in checked_mats:
-            checked_mats.append(mat)
-            found_images = look_for_images_from_mat(mat)
-            for img in found_images:
-                if img not in images:
-                    images.append(img)
+        if mat:
+            if mat not in checked_mats:
+                checked_mats.append(mat)
+                found_images = look_for_images_from_mat(mat)
+                for img in found_images:
+                    if img not in images:
+                        images.append(img)
     return images
 
 def look_for_images_from_mat(mat = bpy.types.Material):
