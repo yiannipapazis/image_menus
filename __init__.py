@@ -12,6 +12,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import bpy
+import bmesh
 
 from bpy.props import IntProperty, FloatProperty, BoolProperty, EnumProperty, StringProperty
 import rna_keymap_ui
@@ -42,7 +43,7 @@ class reload_images_menu(bpy.types.Menu):
         # TODO make recent images reload
         # layout.label(text="Recent")
         # layout.label(text="Images")
-        image_list = get_images_from_objects()
+        image_list = get_images_from_materials(get_materials_from_selected())
         
         if image_list:
             image_data = [img.image.name for img in image_list]
@@ -114,24 +115,18 @@ class load_from_selected_menu(bpy.types.Menu):
         material_list = get_materials_from_selected()
         if material_list:
             for mat in material_list:
-                try:
-                    mat_obj = bpy.data.materials[mat]
-                except KeyError:
-                    mat_obj = False
-                if mat_obj:
-                    mat_image_nodes = look_for_images_from_mat(
-                        mat_obj)
-                    layout.label(text=mat, icon='MATERIAL')
+                mat_image_nodes = look_for_images_from_mat(
+                    mat)
+                layout.label(text=mat.name, icon='MATERIAL')
+                # build menu for each material
+                if mat_image_nodes:
+                    for image_node in mat_image_nodes:
+                        o = layout.operator(
+                            self.operator.bl_idname, text=image_node.image.name, icon='IMAGE_DATA')
+                        o.image_name = image_node.image.name
                     layout.separator()
-                    # build menu for each material
-                    if mat_image_nodes:
-                        for image_node in mat_image_nodes:
-                            o = layout.operator(
-                                self.operator.bl_idname, text=image_node.image.name, icon='IMAGE_DATA')
-                            o.image_name = image_node.image.name
-                        layout.separator()
-                    else:
-                        layout.label(text="No images")
+                else:
+                    layout.label(text="No images")
         else:
             layout.label(text='No materials')
 
@@ -170,44 +165,33 @@ class make_active_from_selected_menu(bpy.types.Menu):
         if material_list:
             layout.menu(reload_images_menu.bl_idname)
             for mat in material_list:
-                try:
-                    mat_obj = bpy.data.materials[mat]
-                except KeyError:
-                    mat_obj = False
-                
-                if mat_obj:
-                    layout.label(text=mat, icon='MATERIAL')
-                    layout.separator()
-                    mat_image_nodes = look_for_images_from_mat(
-                        mat_obj)
+                layout.label(text=mat.name, icon='MATERIAL')
+                mat_image_nodes = look_for_images_from_mat(
+                    mat)
 
-                    # build menu for each material
-                    if mat_image_nodes:
-                        for image_node in mat_image_nodes:
-                            o = layout.operator(
-                                self.operator.bl_idname, text=image_node.image.name, icon='IMAGE_DATA')
-                            o.mat_name = mat
-                            o.node_name = str(image_node)
-                        layout.separator()
-                    else:
-                        layout.label(text="No images")
+                # build menu for each material
+                if mat_image_nodes:
+                    for image_node in mat_image_nodes:
+                        o = layout.operator(
+                            self.operator.bl_idname, text=image_node.image.name, icon='IMAGE_DATA')
+                        o.mat_name = mat.name
+                        o.node_name = str(image_node)
+                    layout.separator()
+                else:
+                    layout.label(text="No images")
         else:
             layout.label(text='No materials')
 
-def get_images_from_objects():
+def get_images_from_materials(materials):
     checked_mats = []
     images = []
-    active_object = bpy.context.active_object
-    materials = active_object.material_slots
     for mat in materials:
-        mat = mat.material
-        if mat:
-            if mat not in checked_mats:
-                checked_mats.append(mat)
-                found_images = look_for_images_from_mat(mat)
-                for img in found_images:
-                    if img not in images:
-                        images.append(img)
+        if mat not in checked_mats:
+            checked_mats.append(mat)
+            found_images = look_for_images_from_mat(mat)
+            for img in found_images:
+                if img not in images:
+                    images.append(img)
     return images
 
 def look_for_images_from_mat(mat = bpy.types.Material):
@@ -230,15 +214,21 @@ def look_for_images_from_mat(mat = bpy.types.Material):
 
 def get_materials_from_selected():
     object_materials = []
-    checked_mats = []
     active_object = bpy.context.active_object
-    if active_object:
-        materials = active_object.material_slots
-        for mat in materials:
-            mat = mat.name
-            if mat not in checked_mats:
-                checked_mats.append(mat)
-                object_materials.append(mat)
+    if bpy.context.mode == 'EDIT_MESH':
+        bm = bmesh.from_edit_mesh(active_object.data)
+        active_face = bm.faces.active
+        if active_face:
+            mat = active_object.material_slots[active_face.material_index].material
+            object_materials.append(mat)
+    elif len(object_materials) == 0:
+        checked_mats = []
+        if active_object:
+            slots = active_object.material_slots
+            for slot in slots:
+                if slot.material not in checked_mats:
+                    checked_mats.append(slot.material)
+                    object_materials.append(slot.material)
     return object_materials
 
 class Prefs(AddonPreferences):
